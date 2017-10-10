@@ -39,18 +39,20 @@ namespace RawRabbit.Context.Enhancer
 			{
 				var dlxName = _conventions.RetryLaterExchangeConvention(timespan);
 				var dlQueueName = _conventions.RetryLaterExchangeConvention(timespan);
-				var channel = _channelFactory.CreateChannel();
-				channel.ExchangeDeclare(dlxName, ExchangeType.Direct, true, true, null);
-				channel.QueueDeclare(dlQueueName, true, false, true, new Dictionary<string, object>
+				using(var channel = _channelFactory.CreateChannel())
 				{
-						{QueueArgument.DeadLetterExchange, args.Exchange},
-						{QueueArgument.Expires, Convert.ToInt32(timespan.Add(TimeSpan.FromSeconds(1)).TotalMilliseconds)},
-						{QueueArgument.MessageTtl, Convert.ToInt32(timespan.TotalMilliseconds)}
-				});
-				channel.QueueBind(dlQueueName, dlxName, args.RoutingKey, null);
-				UpdateHeaders(args.BasicProperties);
-				channel.BasicPublish(dlxName, args.RoutingKey, args.BasicProperties, args.Body);
-				channel.QueueUnbind(dlQueueName, dlxName, args.RoutingKey, null);
+					channel.ExchangeDeclare(dlxName, ExchangeType.Direct, true, true, null);
+					channel.QueueDeclare(dlQueueName, true, false, true, new Dictionary<string, object>
+					{
+							{QueueArgument.DeadLetterExchange, args.Exchange},
+							{QueueArgument.Expires, Convert.ToInt32(timespan.Add(TimeSpan.FromSeconds(1)).TotalMilliseconds)},
+							{QueueArgument.MessageTtl, Convert.ToInt32(timespan.TotalMilliseconds)}
+					});
+					channel.QueueBind(dlQueueName, dlxName, args.RoutingKey, null);
+					UpdateHeaders(args.BasicProperties);
+					channel.BasicPublish(dlxName, args.RoutingKey, args.BasicProperties, args.Body);
+					channel.QueueUnbind(dlQueueName, dlxName, args.RoutingKey, null);
+				}
 			};
 
 			advancedCtx.RetryInfo = GetRetryInformatino(args.BasicProperties);
